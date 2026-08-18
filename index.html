@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Tatmeteo — метеорадар</title>
+  <meta name="description" content="Интерактивная карта метеорадара, спутниковых снимков и опасных погодных явлений." />
+  <meta name="theme-color" content="#10151c" />
+  <script>
+    /* Режим анимаций до первой отрисовки: 'auto' — следовать prefers-reduced-motion,
+       'off' — всегда без анимаций, 'on' — всегда с анимациями (класс не ставится) */
+    (function() { try {
+      var p = localStorage.getItem('animPref') || 'auto';
+      var sys = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (p === 'off' || (p === 'auto' && sys)) document.documentElement.classList.add('reduce-motion');
+    } catch (e) {} })();
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <div id="map"></div>
+  <canvas id="radar"></canvas>
+  <!-- Оверлей грозопеленгатора: жёлтые квадраты молний поверх любого слоя данных -->
+  <canvas id="ltg-canvas"></canvas>
+
+  <div class="panel" id="ctrl">
+    <div id="layers-wrapper">
+      <button class="btn on" id="btn-layers-menu">Слои: dBZ</button>
+      <div class="dropdown-menu" id="layers-dropdown">
+        <div class="dd-item active" data-layer="radar" tabindex="0" role="button">Отражаемость (dBZ)</div>
+        <div class="dd-item" data-layer="wx" tabindex="0" role="button">ОЯ Явления</div>
+        <div class="dd-item" data-layer="sat" tabindex="0" role="button">Спутник (EUMETSAT)</div>
+        <div class="dd-item" data-layer="height" tabindex="0" role="button">Высота ВГО (ДМРЛ)</div>
+        <div class="dd-item" data-layer="dop" tabindex="0" role="button">Радиальная скорость</div>
+      </div>
+    </div>
+    <!-- Выбор канала спутника: виден только в sat-режиме, наполняется из script.js -->
+    <div id="channel-wrapper" style="display:none">
+      <button class="btn on" id="btn-channel">Канал</button>
+      <div class="dropdown-menu" id="channel-dropdown"></div>
+    </div>
+    <!-- Скролл вынесен на внутреннюю обёртку: #ctrl остаётся overflow:visible,
+         поэтому абсолютные дропдауны слоёв/каналов не обрезаются на мобильном.
+         Порядок кнопок — по частоте использования: частые слева, редкие в конце -->
+    <div id="ctrl-scroll">
+      <!-- Высота радиальной скорости (только в режиме «Доплер», источник 4x4) -->
+      <div id="dopheight-wrapper" style="display:none">
+        <button class="btn on" id="btn-dopheight">Высота: 1 км</button>
+        <div class="dropdown-menu" id="dopheight-dropdown"></div>
+      </div>
+      <div class="sep"></div>
+      <button class="btn icon-btn" id="btn-refresh" title="Обновить"><span class="ic">↻</span></button>
+      <button class="btn" id="spd">1×</button>
+      <button class="btn icon-btn" id="btn-toggle-dbz" title="Скрыть слой осадков">👁</button>
+      <button class="btn icon-btn" id="btn-ltg" title="Молнии (грозопеленгатор) — поверх любого слоя">⚡</button>
+      <div id="download-wrapper">
+        <button class="btn icon-btn" id="btn-download" title="Скачать данные радара">⬇</button>
+        <div class="dropdown-menu" id="download-dropdown">
+          <div class="dd-item" data-fmt="map" tabindex="0" role="button">🗺 Карта + слой + легенда (PNG)</div>
+          <div class="dd-item" data-fmt="mapgeo" tabindex="0" role="button">📦 Карта + слой + легенда (ZIP + .pgw)</div>
+          <div class="dd-item" data-fmt="png" tabindex="0" role="button">🖼 PNG — только слой</div>
+          <div class="dd-item" data-fmt="geo" tabindex="0" role="button">🌐 ZIP — слой + .pgw + мета</div>
+          <div class="dd-item" data-fmt="csv" tabindex="0" role="button">📄 CSV — значения dBZ</div>
+        </div>
+      </div>
+      <div class="sep"></div>
+      <button class="btn" id="pxbtn">2x2 км</button>
+      <button class="btn" id="btn-smooth">Сглаживание</button>
+      <div id="smooth-control">
+        <label>сила</label>
+        <input type="range" id="smooth-strength" min="0" max="4" step="1" value="1" />
+        <span id="smooth-val">1</span>
+      </div>
+      <div id="opacity-control">
+        <label>🌓</label>
+        <input type="range" id="opacity-slider" min="0" max="100" value="100" />
+        <span id="opacity-val">100%</span>
+      </div>
+      <div class="sep"></div>
+      <button class="btn icon-btn" id="btn-crosshair" title="Прицел">⊕</button>
+      <button class="btn" id="btn-ruler" title="Линейка">📏</button>
+      <button class="btn icon-btn" id="btn-palettes" title="Палитры">🎨</button>
+      <button class="btn" id="btn-help">Справка</button>
+      <button class="btn" id="btn-theme">Тема</button>
+      <button class="btn" id="btn-anim" title="Анимации: авто (по системе) / вкл / выкл">Анимации: Авто</button>
+    </div>
+  </div>
+
+  <div class="panel" id="legend">
+    <div id="legend-header">
+      <h3 id="ltitle">ОТРАЖАЕМОСТЬ dBZ</h3>
+      <div style="display:flex;align-items:center;gap:4px">
+        <button id="toggle-legend-btn" title="Свернуть/развернуть">−</button>
+        <!-- Скрыть панель целиком: ящик уезжает вправо «в стену» -->
+        <button id="hide-legend-btn" title="Убрать панель" onclick="event.stopPropagation();closePanel('legend')">›</button>
+      </div>
+    </div>
+    <!-- Обёртка grid 1fr→0fr — плавное сворачивание без анимации height -->
+    <div class="lbody-wrap"><div id="lbody"></div></div>
+  </div>
+  <button class="restore-btn" id="restore-legend" onclick="restorePanel('legend')">Легенда</button>
+
+  <div class="panel" id="tl">
+    <button id="playbtn">▶</button>
+    <div id="track">
+      <div id="tfill"></div><div id="tthumb"></div><div id="tlbls"></div>
+      <div id="time-tooltip"><div class="tt-time">--:--</div><div class="tt-date">--</div><div class="tt-diff">сейчас</div></div>
+    </div>
+    <button class="btn" id="b-minus1h" style="padding:4px 8px;font-size:10px">-1ч</button>
+    <button class="btn" id="b-minus10m" style="padding:4px 8px;font-size:10px">-10м</button>
+    <button class="btn" id="b-plus10m" style="padding:4px 8px;font-size:10px">+10м</button>
+    <!-- Скрыть таймлайн: нижний ящик уезжает «под пол» -->
+    <button id="hide-tl-btn" title="Убрать таймлайн" onclick="closePanel('tl')">⌄</button>
+  </div>
+  <button class="restore-btn" id="restore-tl" onclick="restorePanel('tl')">Таймлайн</button>
+
+  <div id="pulse"></div>
+  <div id="dbg" title="Нажмите, чтобы обновить данные"></div>
+  <!-- Индикатор зума: поверх слоя данных, не перехватывает клики по карте -->
+  <div id="zoom-indicator">Z6</div>
+  <div id="hover-indicator"></div>
+  <div id="pixel-popup"></div>
+  <div id="crosshair"><div class="ch-h"></div><div class="ch-v"></div><div class="ch-dot"></div></div>
+  <div id="crosshair-label"></div>
+
+  <div id="palette-modal" role="dialog" aria-modal="true" aria-label="Управление палитрами">
+    <div class="modal-content">
+      <h2><span>🎨 Управление палитрами</span><button class="modal-close" id="modal-close">&times;</button></h2>
+      <div class="modal-tabs"><button class="active" data-layer="radar">Отражаемость</button><button data-layer="wx">Явления</button><button data-layer="sat">Спутник</button></div>
+      <!-- Выбор канала для палитр спутника (виден только на вкладке «Спутник») -->
+      <div id="sat-pal-ch-row" style="display:none">
+        <label for="sat-pal-ch">Канал</label>
+        <select id="sat-pal-ch"></select>
+        <div id="sat-pal-note"></div>
+      </div>
+      <div id="palette-list-container" class="palette-list"></div>
+      <div class="modal-actions">
+        <button class="btn btn-primary" id="load-palette-btn">📂 Загрузить .pal</button>
+        <button class="btn" id="create-palette-btn">➕ Создать</button>
+        <button class="btn btn-danger" id="delete-palette-btn">🗑 Удалить</button>
+        <button class="btn btn-success" id="export-palette-btn">💾 Экспорт</button>
+      </div>
+      <input type="file" id="file-input" accept=".pal,.json,.txt" />
+      <div class="create-form" id="create-form">
+        <label>Название палитры</label><input type="text" id="new-pal-name" placeholder="Моя палитра" value="Новая палитра" />
+        <label>Значения (порог, цвет, метка)</label>
+        <div class="row">
+          <input type="number" id="entry-val" placeholder="дБZ" value="0" step="1" />
+          <input type="color" id="entry-color" value="#00aaff" />
+          <input type="text" id="entry-label" placeholder="метка" value="Осадки" />
+          <button class="btn" id="add-entry-btn">+ Добавить</button>
+        </div>
+        <div class="entries-list" id="entries-list"></div>
+        <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn btn-primary" id="save-palette-btn">💾 Сохранить</button>
+          <button class="btn" id="cancel-create-btn">Отмена</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="help-modal" role="dialog" aria-modal="true" aria-label="Справка">
+    <div class="modal-content">
+      <h2><span>📘 Справка</span><button class="modal-close" id="help-close">&times;</button></h2>
+      <p>Tatmeteo — сайт для визуализации данных и кастомизации отображения их. Изначальные данные только 2х2 км, данные 4х4, 8х8, 1х1 не являются полностью достоверными!<br><br>Спутниковые снимки: © EUMETSAT (каналы MSG, задержка ~15 мин).<br><br>Слой «Радиальная скорость» показывает данные ДМРЛ на высотах 1–4 км. Отрицательные значения направлены к радару, положительные — от радара; цветовая шкала имеет шаг 5 м/с. «Высота ВГО» вынесена в основное меню слоёв.<br><br>Проект команды CSF · Convective Storm Forecast</p>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  
+  <!-- АВТОРИЗАЦИЯ ПОЛНОСТЬЮ ОТКЛЮЧЕНА -->
+  <script>
+    // Проверка авторизации удалена — страница доступна всем
+    
+    // Поддерживаем активную Redis-сессию (опционально)
+    setInterval(function() {
+      fetch('/api/auth?action=heartbeat', {
+        method: 'POST',
+        cache: 'no-store',
+        credentials: 'same-origin'
+      }).catch(function() {});
+    }, 15000);
+  </script>
+  
+  <script src="script.js"></script>
+  
+  <script>
+    (function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2d0eafa2ffcbe60',t:'MTc4NzA1NjEwMQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();
+  </script>
+</body>
+</html>
