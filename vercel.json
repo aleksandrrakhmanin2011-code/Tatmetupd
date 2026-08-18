@@ -1,17 +1,17 @@
 {
   "functions": {
-    "api/adskfjsiguojifnjkserve.js": {
+    "api/adminAEYWTF.js": {
       "includeFiles": "protected/**"
     }
   },
   "rewrites": [
-    { "source": "/api/auth", "destination": "/api/authgrhouhfiesuhghth" },
-    { "source": "/api/me", "destination": "/api/mydsugfusyfjhdsfbe" },
+    { "source": "/api/auth", "destination": "/api/adminAEYWTF" },
+    { "source": "/api/me", "destination": "/api/adminAEYWTF" },
     { "source": "/api/admin", "destination": "/api/adminAEYWTF" },
-    { "source": "/api/captcha", "destination": "/api/captchdgjkjsngjksvna" },
-    { "source": "/api/satProxy", "destination": "/api/satProxy" },
+    { "source": "/api/captcha", "destination": "/api/adminAEYWTF" },
+    { "source": "/api/satProxy", "destination": "/api/adminAEYWTF" },
     { "source": "/login.html", "destination": "/login.html" },
     { "source": "/admin.html", "destination": "/admin.html" },
-    { "source": "/(.*)", "destination": "/api/adskfjsiguojifnjkserve?path=$1" }
+    { "source": "/(.*)", "destination": "/api/adminAEYWTF?path=$1" }
   ]
 }
