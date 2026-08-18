@@ -7,8 +7,6 @@
   <meta name="description" content="Интерактивная карта метеорадара, спутниковых снимков и опасных погодных явлений." />
   <meta name="theme-color" content="#10151c" />
   <script>
-    /* Режим анимаций до первой отрисовки: 'auto' — следовать prefers-reduced-motion,
-       'off' — всегда без анимаций, 'on' — всегда с анимациями (класс не ставится) */
     (function() { try {
       var p = localStorage.getItem('animPref') || 'auto';
       var sys = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -25,7 +23,6 @@
 
   <div id="map"></div>
   <canvas id="radar"></canvas>
-  <!-- Оверлей грозопеленгатора: жёлтые квадраты молний поверх любого слоя данных -->
   <canvas id="ltg-canvas"></canvas>
 
   <div class="panel" id="ctrl">
@@ -39,16 +36,11 @@
         <div class="dd-item" data-layer="dop" tabindex="0" role="button">Радиальная скорость</div>
       </div>
     </div>
-    <!-- Выбор канала спутника: виден только в sat-режиме, наполняется из script.js -->
     <div id="channel-wrapper" style="display:none">
       <button class="btn on" id="btn-channel">Канал</button>
       <div class="dropdown-menu" id="channel-dropdown"></div>
     </div>
-    <!-- Скролл вынесен на внутреннюю обёртку: #ctrl остаётся overflow:visible,
-         поэтому абсолютные дропдауны слоёв/каналов не обрезаются на мобильном.
-         Порядок кнопок — по частоте использования: частые слева, редкие в конце -->
     <div id="ctrl-scroll">
-      <!-- Высота радиальной скорости (только в режиме «Доплер», источник 4x4) -->
       <div id="dopheight-wrapper" style="display:none">
         <button class="btn on" id="btn-dopheight">Высота: 1 км</button>
         <div class="dropdown-menu" id="dopheight-dropdown"></div>
@@ -96,11 +88,9 @@
       <h3 id="ltitle">ОТРАЖАЕМОСТЬ dBZ</h3>
       <div style="display:flex;align-items:center;gap:4px">
         <button id="toggle-legend-btn" title="Свернуть/развернуть">−</button>
-        <!-- Скрыть панель целиком: ящик уезжает вправо «в стену» -->
         <button id="hide-legend-btn" title="Убрать панель" onclick="event.stopPropagation();closePanel('legend')">›</button>
       </div>
     </div>
-    <!-- Обёртка grid 1fr→0fr — плавное сворачивание без анимации height -->
     <div class="lbody-wrap"><div id="lbody"></div></div>
   </div>
   <button class="restore-btn" id="restore-legend" onclick="restorePanel('legend')">Легенда</button>
@@ -114,14 +104,12 @@
     <button class="btn" id="b-minus1h" style="padding:4px 8px;font-size:10px">-1ч</button>
     <button class="btn" id="b-minus10m" style="padding:4px 8px;font-size:10px">-10м</button>
     <button class="btn" id="b-plus10m" style="padding:4px 8px;font-size:10px">+10м</button>
-    <!-- Скрыть таймлайн: нижний ящик уезжает «под пол» -->
     <button id="hide-tl-btn" title="Убрать таймлайн" onclick="closePanel('tl')">⌄</button>
   </div>
   <button class="restore-btn" id="restore-tl" onclick="restorePanel('tl')">Таймлайн</button>
 
   <div id="pulse"></div>
   <div id="dbg" title="Нажмите, чтобы обновить данные"></div>
-  <!-- Индикатор зума: поверх слоя данных, не перехватывает клики по карте -->
   <div id="zoom-indicator">Z6</div>
   <div id="hover-indicator"></div>
   <div id="pixel-popup"></div>
@@ -132,7 +120,6 @@
     <div class="modal-content">
       <h2><span>🎨 Управление палитрами</span><button class="modal-close" id="modal-close">&times;</button></h2>
       <div class="modal-tabs"><button class="active" data-layer="radar">Отражаемость</button><button data-layer="wx">Явления</button><button data-layer="sat">Спутник</button></div>
-      <!-- Выбор канала для палитр спутника (виден только на вкладке «Спутник») -->
       <div id="sat-pal-ch-row" style="display:none">
         <label for="sat-pal-ch">Канал</label>
         <select id="sat-pal-ch"></select>
@@ -176,6 +163,7 @@
   <!-- АВТОРИЗАЦИЯ ПОЛНОСТЬЮ ОТКЛЮЧЕНА -->
   <script>
     // Проверка авторизации удалена — страница доступна всем
+    console.log('✅ Авторизация отключена');
     
     // Поддерживаем активную Redis-сессию (опционально)
     setInterval(function() {
@@ -193,4 +181,4 @@
     (function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2d0eafa2ffcbe60',t:'MTc4NzA1NjEwMQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();
   </script>
 </body>
-</html>
+        </html>
